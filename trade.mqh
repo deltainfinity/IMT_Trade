@@ -24,6 +24,20 @@ struct TradeSettings{
 };
 
 class Trade{
+   protected:
+      enum  CLOSE_MARKET_TYPE{
+         CLOSE_BUY,
+         CLOSE_SELL,
+         CLOSE_ALL_MARKET
+      };
+      enum CLOSE_PENDING_TYPE{
+         CLOSE_BUY_LIMIT,
+         CLOSE_SELL_LIMIT,
+         CLOSE_BUY_STOP,
+         CLOSE_SELL_STOP,
+         CLOSE_ALL_PENDING
+      };
+      
    private:
       int magicNumber;    //number to identify orders
       int slippage;       //max slippage for instant execution brokers
@@ -41,20 +55,6 @@ class Trade{
       bool ModifyOrder(int ticket, TradeSettings &orderSettings);
       bool CloseMultipleOrders(CLOSE_MARKET_TYPE closeType);
       bool DeleteMultipleOrders(CLOSE_PENDING_TYPE deleteType);
-      
-   protected:
-      enum  CLOSE_MARKET_TYPE{
-         CLOSE_BUY,
-         CLOSE_SELL,
-         CLOSE_ALL_MARKET
-      };
-      enum CLOSE_PENDING_TYPE{
-         CLOSE_BUY_LIMIT,
-         CLOSE_SELL_LIMIT,
-         CLOSE_BUY_STOP,
-         CLOSE_SELL_STOP,
-         CLOSE_ALL_PENDING
-      };
       
    public:
       Trade(int mNumber);
