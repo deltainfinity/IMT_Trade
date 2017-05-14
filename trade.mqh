@@ -24,6 +24,7 @@ struct TradeSettings{
 };
 
 class Trade{
+
    protected:
       enum  CLOSE_MARKET_TYPE{
          CLOSE_BUY,
@@ -58,6 +59,32 @@ class Trade{
       
    public:
       Trade(int mNumber);
-      
+      int GetMagicNumber();
+      int OpenBuyOrder(TradeSettings &orderSettings);
+      int OpenSellOrder(TradeSettings &orderSettings);
+      int OpenBuyStopOrder(TradeSettings &orderSettings);
+      int OpenSellStopOrder(TradeSettings &orderSettings);
+      int OpenBuyLimitOrder(TradeSettings &orderSettings);
+      int OpenSellLimitOrder(TradeSettings &orderSettings);
+      bool ModifyOrderSLTPByPoints(int ticket, int stopPoints, int profitPoints = 0);
+      bool ModifyOrderSLTPByPrice(int ticket, double stopPrice, double profitPrice = 0.0);
+      bool CloseMarketOrder(int ticket);
+      bool DeletePendingOrder(int ticket);
+      bool CloseAllBuyOrders();
+      bool CloseAllSellOrders();
+      bool CloseAllMarketOrders();
+      bool DeleteAllBuyLimitOrders();
+      bool DeleteAllSellLimitOrders();
+      bool DeleteAllBuyStopOrders();
+      bool DeleteAllSellStopOrders();
+      bool DeleteAllPendingOrders();
+      void TrailingStop(int ticket, int trailPoints, int minProfit = 0, int step = 10);
+      void TrailingStop(int ticket, double trailPrice, int minProfit = 0, int step = 10);
+      void TrailingStopAll(int trailPoints, int minProfit = 0, int step = 10);
+      void TrailingStopAll(double trailPrice, int minProfit = 0, int step = 10);
+      void BreakEvenStop(int ticket, int minProfit, int lockProfit = 0);
+      void BreakEvenStopAll(int minProfit, int lockProfit = 0);
+      bool IsPositionOpen(int ticket);
+      int TypeOfOrder(int ticket);
 };
 
