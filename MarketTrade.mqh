@@ -9,29 +9,34 @@
 #property strict
 
 #include <IMT\trade.mqh>
-//+------------------------------------------------------------------+
-//|                                                                  |
-//+------------------------------------------------------------------+
+
 class MarketTrade : public Trade{
 
    private:
-      int OpenMarketOrder(TradeSettings &orderSettings, int orderType);
-      bool CloseMultipleOrders(CLOSE_MARKET_TYPE closeType);
       enum  CLOSE_MARKET_TYPE{
             CLOSE_BUY,
             CLOSE_SELL,
             CLOSE_ALL_MARKET
          };
+      int OpenMarketOrder(TradeSettings &orderSettings, int orderType);
+      bool CloseMultipleOrders(CLOSE_MARKET_TYPE closeType);
    
    public:
       MarketTrade();
-      ~MarketTrade();
       int OpenBuyOrder(TradeSettings &orderSettings);
       int OpenSellOrder(TradeSettings &orderSettings);
       bool CloseMarketOrder(int ticket);
       bool CloseAllBuyOrders();
       bool CloseAllSellOrders();
       bool CloseAllMarketOrders();
+      bool ModifyOrderSLTPByPoints(int ticket, int stopPoints, int profitPoints = 0);
+      bool ModifyOrderSLTPByPrice(int ticket, double stopPrice, double profitPrice = 0.0);
+      void TrailingStop(int ticket, int trailPoints, int minProfit = 0, int step = 10);
+      void TrailingStop(int ticket, double trailPrice, int minProfit = 0, int step = 10);
+      void TrailingStopAll(int trailPoints, int minProfit = 0, int step = 10);
+      void TrailingStopAll(double trailPrice, int minProfit = 0, int step = 10);
+      void BreakEvenStop(int ticket, int minProfit, int lockProfit = 0);
+      void BreakEvenStopAll(int minProfit, int lockProfit = 0);
 };
 
 //Open a market order
