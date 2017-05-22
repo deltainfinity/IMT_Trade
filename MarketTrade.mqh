@@ -18,14 +18,15 @@ class MarketTrade : public Trade{
             CLOSE_SELL,
             CLOSE_ALL_MARKET
          };
-      int OpenMarketOrder(TradeSettings &orderSettings, int orderType);
-      bool CloseMultipleOrders(CLOSE_MARKET_TYPE closeType);
+      int OpenMarketOrder(TradeSettings &orderSettings, int orderType); //open a market order
+      bool CloseMultipleOrders(CLOSE_MARKET_TYPE closeType); //close multiple market orders
    
    public:
-      MarketTrade();
-      int OpenBuyOrder(TradeSettings &orderSettings);
-      int OpenSellOrder(TradeSettings &orderSettings);
-      bool CloseMarketOrder(int ticket);
+      MarketTrade(int mNumber):Trade(mNumber){}; //call the base class constructor (ECN brokers)
+      MarketTrade(int mNumber, int slip):Trade(mNumber, slip){}; //call the overloaded base class constructor (instant execution brokers)
+      int OpenBuyOrder(TradeSettings &orderSettings); //open a buy market order
+      int OpenSellOrder(TradeSettings &orderSettings); //open a sell market order
+      bool CloseMarketOrder(int ticket); //close a specific market order
       bool CloseAllBuyOrders();
       bool CloseAllSellOrders();
       bool CloseAllMarketOrders();
@@ -39,7 +40,7 @@ class MarketTrade : public Trade{
       void BreakEvenStopAll(int minProfit, int lockProfit = 0);
 };
 
-//Open a market order
+//Open a market order (protected base function)
 int MarketTrade::OpenMarketOrder(TradeSettings &orderSettings,int orderType){
    int retryCount = 0;
    int ticket, errorCode;
@@ -111,3 +112,71 @@ int MarketTrade::OpenMarketOrder(TradeSettings &orderSettings,int orderType){
    
    return ticket;
 }//end OpenMarketOrder
+
+//close multiple market orders (protected base function)
+bool MarketTrade::CloseMultipleOrders(CLOSE_MARKET_TYPE closeType){
+   bool allOrdersCloseSuccessfully = true;
+   bool closeOrder, orderSelected, orderClosed;
+   int orderType;
+   
+   //loop through the order pool to close matching orders FIFO
+   for(int i = 0; i < OrdersTotal(); i++){
+      //select the next order
+      orderSelected = OrderSelect(i, SELECT_BY_POS);
+      //error handling
+      if(!orderSelected){
+         int errorCode = GetLastError();
+         string errorDesc = ErrorDescription(errorCode);
+         Print("CloseMultipleOrders error selecting order. Error ",errorCode," - ",errorDesc);
+         continue; 
+      }
+      //get the order type of the selected order
+      orderType = OrderType();
+      //determine if order type matches closeType parameter
+      if((closeType == CLOSE_ALL_MARKET && (orderType == OP_BUY || orderType == OP_SELL)) || (closeType == CLOSE_BUY && orderType == OP_BUY) || 
+         (closeType == CLOSE_SELL && orderType == OP_SELL)){
+            closeOrder = true;
+      }else
+         closeOrder = false;
+      //only close orders that have a matching magic number
+      if(closeOrder == true && OrderMagicNumber() == magicNumber){
+         orderClosed = CloseMarketOrder(OrderTicket());
+         if(!orderClosed){
+            Alert("CloseMultipleOrders: ",OrderTypeToString(orderType)," #",OrderTicket()," not closed.");
+            allOrdersClosedSuccessfully = false;
+         }else //order was closed successfully so all orders shift down one ordinal
+            i--;
+      }
+   }//end close order loop
+   
+   return  allOrdersClosedSuccessfully;
+}
+
+//open a buy order and return the ticket number
+int MarketTrade::OpenBuyOrder(TradeSettings &orderSettings){
+   int ticket = OpenMarketOrder(orderSettings, OP_BUY);
+   return ticket;
+}
+
+//open a sell market order and return the ticket number
+int MarketTrade::OpenSellOrder(TradeSettings &orderSettings){
+   int ticket = OpenMarketOrder(orderSettings, OP_SELL);
+   return ticket;
+}
+
+//close a specific market order given by the ticket number
+bool MarketTrade::CloseMarketOrder(int ticket){
+   int retryCount = 0;
+   bool orderClosed = false;
+   int errorCode;
+   string errorDesc, errorMsg, successMsg;
+   bool serverError;
+   double closePrice = 0.0;
+   
+   //select ticket
+   bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+   //exit with error if OrderSelect() fails
+   if(!orderSelected){
+      
+   }
+}
