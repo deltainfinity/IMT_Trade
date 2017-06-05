@@ -115,7 +115,7 @@ int MarketTrade::OpenMarketOrder(TradeSettings &orderSettings,int orderType){
 
 //close multiple market orders (protected base function)
 bool MarketTrade::CloseMultipleOrders(CLOSE_MARKET_TYPE closeType){
-   bool allOrdersCloseSuccessfully = true;
+   bool allOrdersClosedSuccessfully = true;
    bool closeOrder, orderSelected, orderClosed;
    int orderType;
    
@@ -177,6 +177,58 @@ bool MarketTrade::CloseMarketOrder(int ticket){
    bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
    //exit with error if OrderSelect() fails
    if(!orderSelected){
-      
+      errorCode = GetLastError();
+      errorDesc = ErrorDescription(errorCode);
+      StringConcatenate(errorMsg,"Close order: Error selecting order #",ticket,". Error ",errorCode," - ",errorDesc);
+      Alert(errorMsg);
+      return false;
    }
+   int orderType = OrderType();
+   //submit order to server to be closed
+   do{
+      if(TradingIsAllowed()){
+         //get current bid/ask price
+         if(orderType == OP_BUY)
+            closePrice = MarketInfo(OrderSymbol(), MODE_BID);
+         else if(orderType == OP_SELL)
+            closePrice = MarketInfo(OrderSymbol(), MODE_ASK);
+         //close order
+         orderClosed = OrderClose(ticket, OrderLots(), closePrice, slippage, CLR_NONE);
+         //error handling
+         if(!orderClosed){
+             errorCode = GetLastError();
+             errorDesc = ErrorDescription(errorCode);
+             serverError = RetryOnError(errorCode);
+             //fatal error
+             if(serverError == false){
+               StringConcatenate(errorMsg,"Close order #",ticket,": Error ",errorCode," - ",errorDesc);
+               Alert(errorMsg);
+               break;
+             }
+             //server error, retry...
+             else{
+               Print("Server error ",errorCode," - ",errorDesc," detected, retrying...");
+               Sleep(RETRY_DELAY);
+               retryCount++;
+             }
+         }//end error handling
+         //close order successful
+         else{
+            StringConcatenate(successMsg,"Order #",ticket," closed.");
+            Comment(successMsg);
+            Print(successMsg);
+            break;
+         }
+      }
+      else{
+            return orderClosed;
+      }
+   }while(retryCount < MAX_RETRIES);
+   //failed after retries
+   if(retryCount >= MAX_RETRIES){
+      StringConcatenate(errorMsg,"Close order #",ticket,": Max retries exceeded. Last error was ",errorCode," - ",errorDesc);
+      Alert(errorMsg);
+   }
+   
+   return orderClosed;
 }
