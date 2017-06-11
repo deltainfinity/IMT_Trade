@@ -12,7 +12,7 @@
 
 class MarketTrade : public Trade{
 
-   private:
+   protected:
       enum  CLOSE_MARKET_TYPE{
             CLOSE_BUY,
             CLOSE_SELL,
@@ -20,6 +20,7 @@ class MarketTrade : public Trade{
          };
       int OpenMarketOrder(TradeSettings &orderSettings, int orderType); //open a market order
       bool CloseMultipleOrders(CLOSE_MARKET_TYPE closeType); //close multiple market orders
+      void TrailingStopAllLoop(bool stopInPoints, double trail, int minProfit, int step); //helper function for public TrailingStopAll functions
    
    public:
       MarketTrade(int mNumber):Trade(mNumber){}; //call the base class constructor (ECN brokers)
@@ -27,17 +28,17 @@ class MarketTrade : public Trade{
       int OpenBuyOrder(TradeSettings &orderSettings); //open a buy market order
       int OpenSellOrder(TradeSettings &orderSettings); //open a sell market order
       bool CloseMarketOrder(int ticket); //close a specific market order
-      bool CloseAllBuyOrders();
-      bool CloseAllSellOrders();
-      bool CloseAllMarketOrders();
-      bool ModifyOrderSLTPByPoints(int ticket, int stopPoints, int profitPoints = 0);
-      bool ModifyOrderSLTPByPrice(int ticket, double stopPrice, double profitPrice = 0.0);
-      void TrailingStop(int ticket, int trailPoints, int minProfit = 0, int step = 10);
-      void TrailingStop(int ticket, double trailPrice, int minProfit = 0, int step = 10);
-      void TrailingStopAll(int trailPoints, int minProfit = 0, int step = 10);
-      void TrailingStopAll(double trailPrice, int minProfit = 0, int step = 10);
-      void BreakEvenStop(int ticket, int minProfit, int lockProfit = 0);
-      void BreakEvenStopAll(int minProfit, int lockProfit = 0);
+      bool CloseAllBuyOrders(); //close all buy market orders that match the EA magic number
+      bool CloseAllSellOrders(); //close all sell market orders that match the EA magic number
+      bool CloseAllMarketOrders(); //close all martket orders (buy and sell) that match the EA magic number
+      bool ModifyOrderSLTPByPoints(int ticket, int stopPoints, int profitPoints = 0); //modify the stop loss and/or take profit for an open market order by a number of points
+      bool ModifyOrderSLTPByPrice(int ticket, double stopPrice, double profitPrice = 0.0); //modify the stop loss and/or take proift for an open market order to a certain  price
+      void TrailingStop(int ticket, int trailPoints, int minProfit = 0, int step = 10); //calculate and add a trailing stop to an open market order using points
+      void TrailingStop(int ticket, double trailPrice, int minProfit = 0, int step = 10); //calculate and add a trailing stop to an open market order using a certain price
+      void TrailingStopAll(int trailPoints, int minProfit = 0, int step = 10); //add a trailing stop in points to all open market orders that match the EA magic number
+      void TrailingStopAll(double trailPrice, int minProfit = 0, int step = 10); //add a trailign stop at a certain price to all open market orders that match the EA magic number
+      void BreakEvenStop(int ticket, int minProfit, int lockProfit = 0); //add a break even stop to an open market order
+      void BreakEvenStopAll(int minProfit, int lockProfit = 0); //add a break even stop to all open market orders that match the EA magic number
 };
 
 //Open a market order (protected base function)
@@ -266,18 +267,22 @@ bool MarketTrade::ModifyOrderSLTPByPoints(int ticket,int stopPoints,int profitPo
    //calculate and adjust stop loss and take profit for open buy order
    if(orderType == OP_BUY){
       orderSettings.stopLoss = BuyStopLoss(orderSettings.symbol, stopPoints, orderSettings.price);
-      if(orderSettings.stopLoss > 0)
-         orderSettings.stopLoss = AdjustBelowStopLevel(orderSettings.symbol, profitPoints, orderSettings.stopLoss);
+      if(orderSettings.stopLoss > 0){
+         orderSettings.stopLoss = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.stopLoss);
+      }
       orderSettings.takeProfit = BuyTakeProfit(orderSettings.symbol, profitPoints, orderSettings.price);
-      if(orderSettings.takeProfit > 0)
+      if(orderSettings.takeProfit > 0){
          orderSettings.takeProfit = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.takeProfit);
+      }
    }else if(orderType == OP_SELL){
       orderSettings.stopLoss = SellStopLoss(orderSettings.symbol, stopPoints, orderSettings.price);
-      if(orderSettings.stopLoss > 0)
+      if(orderSettings.stopLoss > 0){
          orderSettings.stopLoss = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.stopLoss);
+      }
       orderSettings.takeProfit = SellTakeProfit(orderSettings.symbol, stopPoints, orderSettings.price);
-      if(orderSettings.takeProfit > 0)
+      if(orderSettings.takeProfit > 0){
          orderSettings.takeProfit = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.takeProfit);
+      }
    }
    //set the orderSettings price to 0 to comply with MetaTrader required parameter values
    orderSettings.price = 0;
@@ -303,7 +308,7 @@ bool MarketTrade::ModifyOrderSLTPByPrice(int ticket,double stopPrice,double prof
    //calculate and adjust stop loss and take profit for open buy order
    if(orderType == OP_BUY){
       if(orderSettings.stopLoss > 0)
-         orderSettings.stopLoss = AdjustBelowStopLevel(orderSettings.symbol, profitPoints, orderSettings.stopLoss);
+         orderSettings.stopLoss = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.stopLoss);
       if(orderSettings.takeProfit > 0)
          orderSettings.takeProfit = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.takeProfit);
    }else if(orderType == OP_SELL){
@@ -318,6 +323,7 @@ bool MarketTrade::ModifyOrderSLTPByPrice(int ticket,double stopPrice,double prof
    return orderModified;
 }
 
+//create a trailing stop using points
 void MarketTrade::TrailingStop(int ticket,int trailPoints,int minProfit=0,int step=10){
    //sanity check
    if(trailPoints <= 0)
@@ -325,7 +331,7 @@ void MarketTrade::TrailingStop(int ticket,int trailPoints,int minProfit=0,int st
    //select the order to modify
     bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
    if(!orderSelected){
-      Print("TrailingStop: order #",ticket," not selected!");
+      Print("TrailingStop using points: order #",ticket," not selected!");
       return;
    }
    bool setTrailingStop = false;
@@ -344,7 +350,7 @@ void MarketTrade::TrailingStop(int ticket,int trailPoints,int minProfit=0,int st
    double minProfitAmount = minProfit * point;
    double stepAmount = step * point;
    //calculate trailing stop
-   double trailStopPrice, currentProfit;
+   double trailStopPrice = 0.0, currentProfit;
    if(orderType == OP_BUY){
       double bid = MarketInfo(orderSettings.symbol, MODE_BID);
       trailStopPrice = bid - trailPointsAmount;
@@ -358,7 +364,7 @@ void MarketTrade::TrailingStop(int ticket,int trailPoints,int minProfit=0,int st
       trailStopPrice = NormalizeDouble(trailStopPrice, digits);
       currentProfit = orderSettings.price - ask;
       if((trailStopPrice < orderSettings.stopLoss - stepAmount || orderSettings.stopLoss == 0) && currentProfit >= minProfit)
-         setTrailingStop == true;
+         setTrailingStop = true;
    }
    //set trailing stop
    if(setTrailingStop == true){
@@ -372,4 +378,94 @@ void MarketTrade::TrailingStop(int ticket,int trailPoints,int minProfit=0,int st
          Print("Trailing stop for order #",ticket," modified to ",trailStopPrice);
       }
    }
+}
+
+//create a trailing stop using a price
+void MarketTrade::TrailingStop(int ticket,double trailPrice,int minProfit=0,int step=10){
+   //sanity check
+   if(trailPrice <= 0)
+      return;
+   //select the order to modify
+    bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+   if(!orderSelected){
+      Print("TrailingStop using price: order #",ticket," not selected!");
+      return;
+   }
+   bool setTrailingStop = false;
+   //get order and symbol information
+   int orderType = OrderType();
+   TradeSettings orderSettings;
+   orderSettings.symbol = OrderSymbol();
+   orderSettings.stopLoss = OrderStopLoss();
+   orderSettings.takeProfit = OrderTakeProfit();
+   orderSettings.price = OrderOpenPrice();
+   orderSettings.sltpInPoints = false;
+   double point = MarketInfo(orderSettings.symbol, MODE_POINT);
+   int digits = (int)MarketInfo(orderSettings.symbol, MODE_DIGITS);
+   //convert input into prices
+   double minProfitAmount = minProfit * point;
+   double stepAmount = step * point;
+   //calculate trailing stop
+   double currentProfit;
+   if(orderType == OP_BUY){
+      trailPrice = AdjustBelowStopLevel(orderSettings.symbol, trailPrice);
+      double bid = MarketInfo(orderSettings.symbol, MODE_BID);
+      currentProfit = bid - orderSettings.price;
+      if(trailPrice > orderSettings.stopLoss + stepAmount && currentProfit >= minProfitAmount)
+         setTrailingStop = true;
+   }else if(orderType == OP_SELL){
+      trailPrice = AdjustAboveStopLevel(orderSettings.symbol, trailPrice);
+      double ask = MarketInfo(orderSettings.symbol, MODE_ASK);
+      currentProfit = orderSettings.price - ask;
+      if((trailPrice < orderSettings.stopLoss - stepAmount || orderSettings.stopLoss == 0) && currentProfit >= minProfit)
+         setTrailingStop = true;
+   }
+   //set trailing stop
+   if(setTrailingStop == true){
+      orderSettings.stopLoss = trailPrice;
+      orderSettings.price = 0;
+      bool orderModified = ModifyOrder(ticket, orderSettings);
+      if(!orderModified){
+         Print("Trailing stop for order #",ticket," not set! Trail Stop: ",orderSettings.stopLoss,", Current Stop: ",OrderStopLoss(),", Current Profit: ",currentProfit);
+      }else{
+         Comment("Trailing stop for order #",ticket," modified to ",trailPrice);
+         Print("Trailing stop for order #",ticket," modified to ",trailPrice);
+      }
+   }
+}
+
+//Helper function for TrailingStopAll overloaded functions
+void MarketTrade::TrailingStopAllLoop(bool stopInPoints, double trail, int minProfit, int step){
+   bool orderSelected;
+   int orderType;
+   //loop through order pool and add trailing stop to orders FIFO
+   int totalOrders = OrdersTotal();
+   for(int i = 0; i < totalOrders; i++){
+      orderSelected = OrderSelect(i, SELECT_BY_POS);
+      if(!orderSelected){
+         int errorCode = GetLastError();
+         string errorDesc = ErrorDescription(errorCode);
+         Print("TrailingStopAll error selecting order. Error ",errorCode," - ",errorDesc);
+         continue;
+      }
+      //get the order type of the selected order
+      orderType = OrderType();
+      //skip if magic number doesn't match or order is pending, otherwise set a trailing stop on the order
+      if(magicNumber == OrderMagicNumber() && (orderType == OP_BUY || orderType == OP_SELL)){
+         if(stopInPoints == true)
+            TrailingStop(OrderTicket(), (int)trail, minProfit, step);
+         else
+            TrailingStop(OrderTicket(), trail, minProfit, step);
+      }
+   }
+}
+
+//Set a trailing stop in points for all open orders matching the EA magic nmumber
+void MarketTrade::TrailingStopAll(int trailPoints,int minProfit=0,int step=10){
+   TrailingStopAllLoop(true, (double)trailPoints, minProfit, step);
+}
+
+//Set a trailing stop price for all open orders matching the EA magic number 
+void MarketTrade::TrailingStopAll(double trailPrice,int minProfit=0,int step=10){
+   TrailingStopAllLoop(false, trailPrice, minProfit, step);
 }
