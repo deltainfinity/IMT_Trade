@@ -232,3 +232,144 @@ bool MarketTrade::CloseMarketOrder(int ticket){
    
    return orderClosed;
 }
+
+bool MarketTrade::CloseAllBuyOrders(void){
+   bool result = CloseMultipleOrders(CLOSE_BUY);
+   return result;
+}
+
+bool MarketTrade::CloseAllSellOrders(void){
+   bool result = CloseMultipleOrders(CLOSE_SELL);
+   return result;
+}
+
+bool MarketTrade::CloseAllMarketOrders(void){
+   bool result = CloseMultipleOrders(CLOSE_ALL_MARKET);
+   return result;
+}
+
+bool MarketTrade::ModifyOrderSLTPByPoints(int ticket,int stopPoints,int profitPoints=0){
+   //sanity check
+   if(stopPoints <= 0 && profitPoints <= 0)
+      return false;
+   //select the order to modify
+   bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+   if(!orderSelected){
+      Print("Modify Order SLTP By Points: order #",ticket," not selected!");
+      return false;
+   }
+   //get order type, order symbol, and order open price for selected order
+   TradeSettings orderSettings;
+   int orderType = OrderType();
+   orderSettings.symbol = OrderSymbol();
+   orderSettings.price = OrderOpenPrice();
+   //calculate and adjust stop loss and take profit for open buy order
+   if(orderType == OP_BUY){
+      orderSettings.stopLoss = BuyStopLoss(orderSettings.symbol, stopPoints, orderSettings.price);
+      if(orderSettings.stopLoss > 0)
+         orderSettings.stopLoss = AdjustBelowStopLevel(orderSettings.symbol, profitPoints, orderSettings.stopLoss);
+      orderSettings.takeProfit = BuyTakeProfit(orderSettings.symbol, profitPoints, orderSettings.price);
+      if(orderSettings.takeProfit > 0)
+         orderSettings.takeProfit = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.takeProfit);
+   }else if(orderType == OP_SELL){
+      orderSettings.stopLoss = SellStopLoss(orderSettings.symbol, stopPoints, orderSettings.price);
+      if(orderSettings.stopLoss > 0)
+         orderSettings.stopLoss = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.stopLoss);
+      orderSettings.takeProfit = SellTakeProfit(orderSettings.symbol, stopPoints, orderSettings.price);
+      if(orderSettings.takeProfit > 0)
+         orderSettings.takeProfit = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.takeProfit);
+   }
+   //set the orderSettings price to 0 to comply with MetaTrader required parameter values
+   orderSettings.price = 0;
+   bool orderModified = ModifyOrder(ticket, orderSettings);
+   return orderModified;
+}
+
+bool MarketTrade::ModifyOrderSLTPByPrice(int ticket,double stopPrice,double profitPrice=0.000000){
+   //sanity check
+   if(stopPrice <= 0 && profitPrice <= 0)
+      return false;
+   //select the order to modify
+   bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+   if(!orderSelected){
+      Print("Modify Order SLTP By Price: order #",ticket," not selected!");
+      return false;
+   }
+   //get order type, order symbol, and order open price for selected order
+   TradeSettings orderSettings;
+   int orderType = OrderType();
+   orderSettings.symbol = OrderSymbol();
+   orderSettings.price = OrderOpenPrice();
+   //calculate and adjust stop loss and take profit for open buy order
+   if(orderType == OP_BUY){
+      if(orderSettings.stopLoss > 0)
+         orderSettings.stopLoss = AdjustBelowStopLevel(orderSettings.symbol, profitPoints, orderSettings.stopLoss);
+      if(orderSettings.takeProfit > 0)
+         orderSettings.takeProfit = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.takeProfit);
+   }else if(orderType == OP_SELL){
+      if(orderSettings.stopLoss > 0)
+         orderSettings.stopLoss = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.stopLoss);
+      if(orderSettings.takeProfit > 0)
+         orderSettings.takeProfit = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.takeProfit);
+   }
+   //set the orderSettings price to 0 to comply with MetaTrader required parameter values
+   orderSettings.price = 0;
+   bool orderModified = ModifyOrder(ticket, orderSettings);
+   return orderModified;
+}
+
+void MarketTrade::TrailingStop(int ticket,int trailPoints,int minProfit=0,int step=10){
+   //sanity check
+   if(trailPoints <= 0)
+      return;
+   //select the order to modify
+    bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+   if(!orderSelected){
+      Print("TrailingStop: order #",ticket," not selected!");
+      return;
+   }
+   bool setTrailingStop = false;
+   //get order and symbol information
+   int orderType = OrderType();
+   TradeSettings orderSettings;
+   orderSettings.symbol = OrderSymbol();
+   orderSettings.stopLoss = OrderStopLoss();
+   orderSettings.takeProfit = OrderTakeProfit();
+   orderSettings.price = OrderOpenPrice();
+   orderSettings.sltpInPoints = false;
+   double point = MarketInfo(orderSettings.symbol, MODE_POINT);
+   int digits = (int)MarketInfo(orderSettings.symbol, MODE_DIGITS);
+   //convert input into prices
+   double trailPointsAmount = trailPoints * point;
+   double minProfitAmount = minProfit * point;
+   double stepAmount = step * point;
+   //calculate trailing stop
+   double trailStopPrice, currentProfit;
+   if(orderType == OP_BUY){
+      double bid = MarketInfo(orderSettings.symbol, MODE_BID);
+      trailStopPrice = bid - trailPointsAmount;
+      trailStopPrice = NormalizeDouble(trailStopPrice, digits);
+      currentProfit = bid - orderSettings.price;
+      if(trailStopPrice > orderSettings.stopLoss + stepAmount && currentProfit >= minProfitAmount)
+         setTrailingStop = true;
+   }else if(orderType == OP_SELL){
+      double ask = MarketInfo(orderSettings.symbol, MODE_ASK);
+      trailStopPrice = ask + trailPointsAmount;
+      trailStopPrice = NormalizeDouble(trailStopPrice, digits);
+      currentProfit = orderSettings.price - ask;
+      if((trailStopPrice < orderSettings.stopLoss - stepAmount || orderSettings.stopLoss == 0) && currentProfit >= minProfit)
+         setTrailingStop == true;
+   }
+   //set trailing stop
+   if(setTrailingStop == true){
+      orderSettings.stopLoss = trailStopPrice;
+      orderSettings.price = 0;
+      bool orderModified = ModifyOrder(ticket, orderSettings);
+      if(!orderModified){
+         Print("Trailing stop for order #",ticket," not set! Trail Stop: ",orderSettings.stopLoss,", Current Stop: ",OrderStopLoss(),", Current Profit: ",currentProfit);
+      }else{
+         Comment("Trailing stop for order #",ticket," modified to ",trailStopPrice);
+         Print("Trailing stop for order #",ticket," modified to ",trailStopPrice);
+      }
+   }
+}
