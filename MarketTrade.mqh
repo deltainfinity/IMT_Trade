@@ -469,3 +469,79 @@ void MarketTrade::TrailingStopAll(int trailPoints,int minProfit=0,int step=10){
 void MarketTrade::TrailingStopAll(double trailPrice,int minProfit=0,int step=10){
    TrailingStopAllLoop(false, trailPrice, minProfit, step);
 }
+
+void MarketTrade::BreakEvenStop(int ticket,int minProfit,int lockProfit=0){
+   //sanity check
+   if(minProfit <= 0)
+      return;
+   bool orderSelected = OrderSelect(ticket, SELECT_BY_TICKET);
+   if(!orderSelected){
+      Print("BreakEvenStop: order #",ticket," not selected!");
+      return;
+   }
+   bool setBreakEvenStop = false;
+   //get order and symbol information
+   int orderType = OrderType();
+   TradeSettings ts;
+   ts.symbol = OrderSymbol();
+   ts.stopLoss = OrderStopLoss();
+   ts.takeProfit = OrderTakeProfit();
+   ts.price = OrderOpenPrice();
+   ts.sltpInPoints = false;
+   double point = MarketInfo(ts.symbol, MODE_POINT);
+   int digits = (int)MarketInfo(ts.symbol, MODE_DIGITS);
+   //convert input to prices
+   double minProfitAmount = minProfit * point;
+   double lockProfitAmount = lockProfit * point;
+   //calculate break even stop price
+   double breakEvenStopPrice = 0.0, currentProfit;
+   if(orderType == OP_BUY){
+      double bid = MarketInfo(ts.symbol, MODE_BID);
+      breakEvenStopPrice = ts.price + lockProfitAmount;
+      breakEvenStopPrice = NormalizeDouble(breakEvenStopPrice, digits);
+      currentProfit = bid - ts.price;
+      if(breakEvenStopPrice > ts.stopLoss && currentProfit >= minProfitAmount)
+         setBreakEvenStop = true;
+   }else if(orderType == OP_SELL){
+      double ask = MarketInfo(ts.symbol, MODE_ASK);
+      breakEvenStopPrice = ts.price - lockProfitAmount;
+      breakEvenStopPrice = NormalizeDouble(breakEvenStopPrice, digits);
+      currentProfit = ts.price - ask;
+      if((breakEvenStopPrice < ts.stopLoss || ts.stopLoss == 0) && currentProfit >= minProfitAmount)
+         setBreakEvenStop = true;
+   }
+   //set break even stop
+   if(setBreakEvenStop == true){
+      ts.stopLoss = breakEvenStopPrice;
+      ts.price = 0;
+      bool orderModified = ModifyOrder(ticket, ts);
+      if(!orderModified){
+         Print("Break even stop for order #",ticket," not set! Break Even Stop: ",ts.stopLoss,", Current Stop: ",OrderStopLoss(),", Current Profit: ",currentProfit);
+      }else{
+         Comment("Break even stop for order #",ticket," set at ",ts.stopLoss);
+         Print("Break even stop for order #",ticket," set at ",ts.stopLoss);
+      }
+   }
+}
+
+void MarketTrade::BreakEvenStopAll(int minProfit,int lockProfit=0){ 
+   bool orderSelected;
+   int orderType;
+   //loop through the order pool FIFO
+   int totalOrders = OrdersTotal();
+   for(int i = 0; i < totalOrders; i++){
+      orderSelected = OrderSelect(i, SELECT_BY_POS);
+      if(!orderSelected){
+         int errorCode = GetLastError();
+         string errorDesc = ErrorDescription(errorCode);
+         Print("BreakEvenStopAll: error selecting order. Error ",errorCode," - ",errorDesc);
+         continue;
+      }
+      //get the order type of the selected order
+      orderType = OrderType();
+      //set the break even stop if the magic numbers match and the order is not pending
+      if(magicNumber == OrderMagicNumber() && (orderType == OP_BUY || orderType == OP_SELL)){
+         BreakEvenStop(OrderTicket(), minProfit, lockProfit);
+      }
+   }
+}
