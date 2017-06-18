@@ -439,8 +439,7 @@ void MarketTrade::TrailingStopAllLoop(bool stopInPoints, double trail, int minPr
    bool orderSelected;
    int orderType;
    //loop through order pool and add trailing stop to orders FIFO
-   int totalOrders = OrdersTotal();
-   for(int i = 0; i < totalOrders; i++){
+   for(int i = 0; i < OrdersTotal(); i++){
       orderSelected = OrderSelect(i, SELECT_BY_POS);
       if(!orderSelected){
          int errorCode = GetLastError();
@@ -528,8 +527,7 @@ void MarketTrade::BreakEvenStopAll(int minProfit,int lockProfit=0){
    bool orderSelected;
    int orderType;
    //loop through the order pool FIFO
-   int totalOrders = OrdersTotal();
-   for(int i = 0; i < totalOrders; i++){
+   for(int i = 0; i < OrdersTotal(); i++){
       orderSelected = OrderSelect(i, SELECT_BY_POS);
       if(!orderSelected){
          int errorCode = GetLastError();
