@@ -129,7 +129,7 @@ bool PendingTrade::DeleteMultipleOrders(CLOSE_PENDING_TYPE deleteType){
    return allOrdersDeleted;
 }
 
-//open a buy stop order using the TradeSettings values
+//open a buy stop order using the TradeSettings parameter values
 int PendingTrade::OpenBuyStopOrder(TradeSettings &orderSettings){
    //check that buy stop price is the min distance above ask price and adjust if necessary
    orderSettings.price = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.price);
@@ -148,3 +148,140 @@ int PendingTrade::OpenBuyStopOrder(TradeSettings &orderSettings){
    return ticket;
 }
 
+//open a sell stop order using the TradeSettings parameter values
+int PendingTrade::OpenSellStopOrder(TradeSettings &orderSettings){
+   //check that the stop price is a minimum distance below the bid price and adjust if necessary
+   orderSettings.price = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.price);
+    //if there is a stop loss in points then calculate the stop price
+   if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
+      orderSettings.stopLoss = SellStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
+      orderSettings.sltpInPoints = false;
+   }
+   //if there is a take profit in points then calculate the take profit price
+   if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
+      orderSettings.takeProfit = SellTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
+      orderSettings.sltpInPoints = false;
+   }
+   //submit the trade
+   int ticket = OpenPendingOrder(orderSettings, OP_SELLSTOP);
+   return ticket;
+}
+
+//open a buy limit order using the TradeSettings parameter value
+int PendingTrade::OpenBuyLimitOrder(TradeSettings &orderSettings){
+   //check that the stop price is a minimum distance below the bid price and adjust if necessary
+   orderSettings.price = AdjustBelowStopLevel(orderSettings.symbol, orderSettings.price);
+    //if there is a stop loss in points then calculate the stop price
+   if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
+      orderSettings.stopLoss = BuyStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
+      orderSettings.sltpInPoints = false;
+   }
+   //if there is a take profit in points then calculate the take profit price
+   if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
+      orderSettings.takeProfit = BuyTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
+      orderSettings.sltpInPoints = false;
+   }
+   //submit the trade
+   int ticket = OpenPendingOrder(orderSettings, OP_BUYLIMIT);
+   return ticket;
+}
+
+//open a sell limit order using the TradeSettings parameter value
+int PendingTrade::OpenSellLimitOrder(TradeSettings &orderSettings){
+   //check that buy stop price is the min distance above ask price and adjust if necessary
+   orderSettings.price = AdjustAboveStopLevel(orderSettings.symbol, orderSettings.price);
+   //if there is a stop loss in points then calculate the stop price
+   if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
+      orderSettings.stopLoss = SellStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
+      orderSettings.sltpInPoints = false;
+   }
+   //if there is a take profit in points then calculate the take profit price
+   if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
+      orderSettings.takeProfit = SellTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
+      orderSettings.sltpInPoints = false;
+   }
+   //submit the trade
+   int ticket = OpenPendingOrder(orderSettings, OP_SELLLIMIT);
+   return ticket;
+}
+
+//delete a pending order
+bool PendingTrade::DeletePendingOrder(int ticket){
+   int retryCount = 0;
+   bool orderDeleted = false;
+   int errorCode;
+   string errorDesc, errorMsg, successMsg;
+   bool serverError;
+   
+   //submit order to server to be deleted
+   do{
+      if(TradingIsAllowed()){
+         orderDeleted = OrderDelete(ticket);
+         //error handling
+         if(!orderDeleted){
+             errorCode = GetLastError();
+             errorDesc = ErrorDescription(errorCode);
+             serverError = RetryOnError(errorCode);
+             //fatal error
+             if(serverError == false){
+               StringConcatenate(errorMsg,"DeletePendingOrder #",ticket,": Error ",errorCode," - ",errorDesc);
+               Alert(errorMsg);
+               break;
+             }
+             //server error, retry...
+             else{
+               Print("Server error ",errorCode," - ",errorDesc," detected, retrying...");
+               Sleep(RETRY_DELAY);
+               retryCount++;
+             }
+         }//end error handling
+         //close order successful
+         else{
+            StringConcatenate(successMsg,"Pending order #",ticket," deleted.");
+            Comment(successMsg);
+            Print(successMsg);
+            break;
+         }
+      }
+      else{
+            return orderDeleted;
+      }
+   }while(retryCount < MAX_RETRIES);
+   //failed after retries
+   if(retryCount >= MAX_RETRIES){
+      StringConcatenate(errorMsg,"DeletePendingOrder #",ticket,": Max retries exceeded. Last error was ",errorCode," - ",errorDesc);
+      Alert(errorMsg);
+   }
+   
+   return orderDeleted;
+}
+
+//delete all buy limit orders placed by this instance
+bool PendingTrade::DeleteAllBuyLimitOrders(void){
+   bool result = DeleteMultipleOrders(CLOSE_BUY_LIMIT);
+   return result;
+}
+
+//delete all sell limit orders placed by this instance
+bool PendingTrade::DeleteAllSellLimitOrders(void){
+   bool result = DeleteMultipleOrders(CLOSE_SELL_LIMIT);
+   return result;
+}
+
+//delete all buy stop orders placed by this instance
+bool PendingTrade::DeleteAllBuyStopOrders(void){
+   bool result = DeleteMultipleOrders(CLOSE_BUY_STOP);
+   return result;
+}
+
+//delete all sell stop orders placed by this instance
+bool PendingTrade::DeleteAllSellStopOrders(void){
+   bool result = DeleteMultipleOrders(CLOSE_SELL_STOP);
+   return result;
+}
+
+//delete all pending orders placed by this instance, regardless of type
+bool PendingTrade::DeleteAllPendingOrders(void){
+   bool result = DeleteMultipleOrders(CLOSE_ALL_PENDING);
+   return result;
+}
