@@ -14,6 +14,7 @@ class Order{
       int GetOrderID(void);
       bool IsOrderValid(void);
       bool IsPositionOpen(void);
+      int GetOrderType(void);
       
    private:
       int orderID;
@@ -50,4 +51,16 @@ bool Order::IsPositionOpen(void){
          return true;
    }
    return false;
+}
+
+int Order::GetOrderType(void){
+   if(!IsOrderValid())
+      return -1;
+   bool orderSelected = OrderSelect(orderID, SELECT_BY_TICKET);
+   if(!orderSelected){
+      Print("GetOrderID: order #",orderID," not found!");
+      return -1;
+   }
+   
+   return OrderType();
 }

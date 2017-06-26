@@ -24,6 +24,8 @@ class PendingTrade : public Trade{
       bool DeleteMultipleOrders(CLOSE_PENDING_TYPE deleteType);
       
    public:
+      PendingTrade(int mNumber):Trade(mNumber){}; //call the base class constructor (ECN brokers)
+      PendingTrade(int mNumber, int slip):Trade(mNumber, slip){}; //call the overloaded base class constructor (instant execution brokers)
       int OpenBuyStopOrder(TradeSettings &orderSettings);
       int OpenSellStopOrder(TradeSettings &orderSettings);
       int OpenBuyLimitOrder(TradeSettings &orderSettings);
