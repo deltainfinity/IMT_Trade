@@ -138,13 +138,13 @@ int PendingTrade::OpenBuyStopOrder(TradeSettings &orderSettings){
    //if there is a stop loss in points then calculate the stop price
    if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
       orderSettings.stopLoss = BuyStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
    //if there is a take profit in points then calculate the take profit price
    if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
       orderSettings.takeProfit = BuyTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
+   //now we know that the sltp is not in points
+   orderSettings.sltpInPoints = false;
    //submit the trade
    int ticket = OpenPendingOrder(orderSettings, OP_BUYSTOP);
    return ticket;
@@ -157,13 +157,13 @@ int PendingTrade::OpenSellStopOrder(TradeSettings &orderSettings){
     //if there is a stop loss in points then calculate the stop price
    if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
       orderSettings.stopLoss = SellStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
    //if there is a take profit in points then calculate the take profit price
    if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
       orderSettings.takeProfit = SellTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
+   //now we know that the sltp is not in points
+   orderSettings.sltpInPoints = false;
    //submit the trade
    int ticket = OpenPendingOrder(orderSettings, OP_SELLSTOP);
    return ticket;
@@ -176,13 +176,13 @@ int PendingTrade::OpenBuyLimitOrder(TradeSettings &orderSettings){
     //if there is a stop loss in points then calculate the stop price
    if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
       orderSettings.stopLoss = BuyStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
    //if there is a take profit in points then calculate the take profit price
    if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
       orderSettings.takeProfit = BuyTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
+   //now we know that the sltp is not in points
+   orderSettings.sltpInPoints = false;
    //submit the trade
    int ticket = OpenPendingOrder(orderSettings, OP_BUYLIMIT);
    return ticket;
@@ -195,13 +195,13 @@ int PendingTrade::OpenSellLimitOrder(TradeSettings &orderSettings){
    //if there is a stop loss in points then calculate the stop price
    if(orderSettings.sltpInPoints == true && orderSettings.stopLoss > 0){
       orderSettings.stopLoss = SellStopLoss(orderSettings.symbol, (int)orderSettings.stopLoss, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
    //if there is a take profit in points then calculate the take profit price
    if(orderSettings.sltpInPoints == true && orderSettings.takeProfit > 0){
       orderSettings.takeProfit = SellTakeProfit(orderSettings.symbol, (int)orderSettings.takeProfit, orderSettings.price);
-      orderSettings.sltpInPoints = false;
    }
+   //now we know that the sltp is not in points
+   orderSettings.sltpInPoints = false;
    //submit the trade
    int ticket = OpenPendingOrder(orderSettings, OP_SELLLIMIT);
    return ticket;

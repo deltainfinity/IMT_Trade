@@ -40,10 +40,10 @@ double TradeVolume::CalculateVolume(string symbol,double percent,double stop,dou
    if(percent > MAX_PERCENT)
       percent = MAX_PERCENT;
    //get the amount to risk and the tick size
-   double amount = AccountInfoDouble(ACCOUNT_BALANCE) * percent;
+   double riskAmount = AccountInfoDouble(ACCOUNT_BALANCE) * percent;
    double tickSize = SymbolInfoDouble(symbol, SYMBOL_TRADE_TICK_VALUE);
    //calculate the volume to order in lots
-   volume = (amount / stopPoints) / tickSize;
+   volume = (riskAmount / stopPoints) / tickSize;
    volume = VerifyVolume(symbol, volume);
    
    return volume;
